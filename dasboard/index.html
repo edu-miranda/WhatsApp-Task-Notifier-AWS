@@ -1,0 +1,297 @@
+<!D<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard de tarefas</title>
+<style>
+  :root {
+    --bg: #f4f3ef;
+    --card: #ffffff;
+    --border: #ddd9cf;
+    --text: #2c2c2a;
+    --muted: #6b6a63;
+    --accent: #185fa5;
+    --ok-bg: #eaf3de;
+    --ok-text: #27500a;
+    --warn-bg: #faeeda;
+    --warn-text: #633806;
+    --help-bg: #e6f1fb;
+    --help-text: #0c447c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 24px;
+  }
+  .container { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+  p.sub { color: var(--muted); margin: 0 0 24px; font-size: 14px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  select {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 14px;
+    background: white;
+  }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+  }
+  .row:last-child { border-bottom: none; }
+  .row p { margin: 0; }
+  .row .tarefa { font-size: 14px; font-weight: 500; }
+  .row .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .badge {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+  .badge.ok { background: var(--ok-bg); color: var(--ok-text); }
+  .badge.warn { background: var(--warn-bg); color: var(--warn-text); }
+  .badge.help { background: var(--help-bg); color: var(--help-text); }
+  .top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  button.logout {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--muted);
+  }
+  #loading, #login-screen { text-align: center; padding: 60px 20px; color: var(--muted); }
+  #login-screen button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    margin-top: 16px;
+  }
+  .empty { color: var(--muted); font-size: 14px; text-align: center; padding: 20px 0; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <div id="login-screen" style="display:none;">
+    <h1>Dashboard de tarefas</h1>
+    <p class="sub">Faça login para continuar</p>
+    <button onclick="redirectToLogin()">Entrar</button>
+  </div>
+
+  <div id="loading">Carregando...</div>
+
+  <div id="dashboard" style="display:none;">
+    <div class="top-bar">
+      <div>
+        <h1>Dashboard de tarefas</h1>
+        <p class="sub" style="margin:0;">Histórico de respostas por funcionário</p>
+      </div>
+      <button class="logout" onclick="logout()">Sair</button>
+    </div>
+
+    <div class="card">
+       <select id="usuario-select" onchange="carregarDados()">
+        <option value="01">01 - SEU_USUARIO_1</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <div id="lista-interacoes"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+
+const CONFIG = {
+  userPoolDomain: "SEU_DOMINIO_COGNITO",
+  clientId: "SEU_APP_CLIENT_ID",
+  apiUrl: "/dados",
+  redirectUri: window.location.origin + window.location.pathname
+};
+
+function gerarStringAleatoria(tamanho) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let resultado = "";
+  const valores = crypto.getRandomValues(new Uint8Array(tamanho));
+  valores.forEach(v => resultado += chars[v % chars.length]);
+  return resultado;
+}
+
+async function gerarCodeChallenge(verifier) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(verifier);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return btoa(String.fromCharCode(...new Uint8Array(hash)))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function redirectToLogin() {
+  const verifier = gerarStringAleatoria(64);
+  sessionStorage.setItem("pkce_verifier", verifier);
+  const challenge = await gerarCodeChallenge(verifier);
+
+  const params = new URLSearchParams({
+    client_id: CONFIG.clientId,
+    response_type: "code",
+    scope: "openid email",
+    redirect_uri: CONFIG.redirectUri,
+    code_challenge: challenge,
+    code_challenge_method: "S256"
+  });
+
+  window.location.href = `${CONFIG.userPoolDomain}/oauth2/authorize?${params.toString()}`;
+}
+
+function logout() {
+  sessionStorage.clear();
+  const params = new URLSearchParams({
+    client_id: CONFIG.clientId,
+    logout_uri: CONFIG.redirectUri
+  });
+  window.location.href = `${CONFIG.userPoolDomain}/logout?${params.toString()}`;
+}
+
+async function trocarCodePorToken(code) {
+  const verifier = sessionStorage.getItem("pkce_verifier");
+  const body = new URLSearchParams({
+    grant_type: "authorization_code",
+    client_id: CONFIG.clientId,
+    code: code,
+    redirect_uri: CONFIG.redirectUri,
+    code_verifier: verifier
+  });
+
+  const resp = await fetch(`${CONFIG.userPoolDomain}/oauth2/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString()
+  });
+
+  if (!resp.ok) throw new Error("Falha ao trocar code por token");
+  const dados = await resp.json();
+  sessionStorage.setItem("id_token", dados.id_token);
+  sessionStorage.setItem("access_token", dados.access_token);
+}
+
+async function carregarDados() {
+  const idUsuario = document.getElementById("usuario-select").value;
+  const token = sessionStorage.getItem("id_token");
+  const lista = document.getElementById("lista-interacoes");
+  lista.innerHTML = "<p class='empty'>Carregando...</p>";
+
+  try {
+    const resp = await fetch(`${CONFIG.apiUrl}?ID=${idUsuario}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (resp.status === 401) {
+      sessionStorage.clear();
+      mostrarLogin();
+      return;
+    }
+
+    const itens = await resp.json();
+    renderizarLista(itens);
+  } catch (e) {
+    lista.innerHTML = "<p class='empty'>Erro ao carregar dados.</p>";
+  }
+}
+
+function renderizarLista(itens) {
+  const lista = document.getElementById("lista-interacoes");
+  if (!itens || itens.length === 0) {
+    lista.innerHTML = "<p class='empty'>Nenhuma interação registrada.</p>";
+    return;
+  }
+
+  const ordenados = itens.sort((a, b) => (a.tarefa_data < b.tarefa_data ? 1 : -1));
+
+  lista.innerHTML = ordenados.map(item => {
+    let badgeClasse = "warn";
+    let badgeTexto = "não feito";
+    if (item.status === "concluido") { badgeClasse = "ok"; badgeTexto = "feito"; }
+    if (item.status === "pediu_ajuda") { badgeClasse = "help"; badgeTexto = "pediu ajuda"; }
+
+    const dataFormatada = item.tarefa_data.split("#")[0]?.slice(0, 16).replace("T", " ") || "";
+
+    return `
+      <div class="row">
+        <div>
+          <p class="tarefa">${item.tarefa}</p>
+          <p class="meta">${dataFormatada}</p>
+        </div>
+        <span class="badge ${badgeClasse}">${badgeTexto}</span>
+      </div>
+    `;
+  }).join("");
+}
+
+function mostrarLogin() {
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("dashboard").style.display = "none";
+  document.getElementById("login-screen").style.display = "block";
+}
+
+function mostrarDashboard() {
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("dashboard").style.display = "block";
+  carregarDados();
+}
+
+(async function init() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+
+  if (code) {
+    try {
+      await trocarCodePorToken(code);
+      window.history.replaceState({}, document.title, CONFIG.redirectUri);
+      mostrarDashboard();
+    } catch (e) {
+      mostrarLogin();
+    }
+    return;
+  }
+
+  const tokenExistente = sessionStorage.getItem("id_token");
+  if (tokenExistente) {
+    mostrarDashboard();
+  } else {
+    mostrarLogin();
+  }
+})();
+</script>
+
+</body>
+</html>
