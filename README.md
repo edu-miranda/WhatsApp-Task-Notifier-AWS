@@ -1,7 +1,7 @@
-# WhatsApp-Taks-Notifier-AWS
+# WhatsApp-Task-Notifier-AWS
 Automação de notificações de tarefas via WhatsApp Business API e AWS, com dashboard web para acompanhamento em tempo real.
 
-https://github.com/user-attachments/assets/02820e8e-8330-40ce-9b58-8bdb2a5f834f
+<video src="https://github.com/user-attachments/assets/02820e8e-8330-40ce-9b58-8bdb2a5f834f" controls></video>
 
 ---
 
