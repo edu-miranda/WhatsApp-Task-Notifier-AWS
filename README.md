@@ -17,7 +17,7 @@ mercado, e foi reconstruído aqui como estudo aprofundado de arquitetura
 serverless, também servindo de apoio para minha certificação **AWS
 CLF-C02**.
 
-A arquitetura é genérica o suficiente para outros casos de notificação e
+A arquitetura também pode ser implementada para outros casos de notificação e
 confirmação via WhatsApp, como lembretes de medicação, check-ins de saúde,
 onboarding de funcionários, ou qualquer fluxo que precise de um lembrete
 programado com resposta rastreável, bastando adaptar o conteúdo das
